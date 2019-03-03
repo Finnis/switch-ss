@@ -63,7 +63,7 @@ do
         done
     echo -e "${purple} 0: ${purple}Restart current server ${plain}"
     echo -e "${blue} a: ${blue}Add a config file.${plain}"
-    echo -e "${blue} d: ${blue}Delect a server.${plain}"
+    echo -e "${blue} d: ${blue}Delect servers.${plain}"
     echo -e "${red} e: Exit.${plain}"
     }
 
@@ -71,7 +71,7 @@ do
     do
         showChoice
         read -p "[Default:0] " sel
-        [ -z $sel ] && sel="0"
+        [[ -z $sel ]] && sel="0"
 #        [[ ! $sel =~ ^[0-9]+$ ]] && echo -e "${red}[Error!] Please try again. ${plain}" && sleep 0.7 && continue
         if [[ $sel =~ ^[0-9]+$ && $sel -lt $i || $sel = "a" || $sel = "d" || $sel = "e" ]] >/dev/null 2>&1; then
             break
@@ -189,14 +189,32 @@ EOF
             fi
         done
     elif [ $sel = "d" ]; then
-        echo -e "${yellow}Choose the server to delete:${plain}"
+        echo -e "${yellow}Choose servers to delete [Use backspace for more]:${plain}"
         while true
         do
             echo -e "${yellow}[Default ${red}n ${yellow}to cancel.]${plain} \c"
             read del1
-            [ -z $del1 ] && del1="n"
-            if [[ $del1 =~ ^[0-9]+$ && $del1 -lt $i ]]; then
-                if [ $cur_ss = ${node[$del1]} ]; then
+            [[ ! $del1 ]] && del1="n"
+            delCount=0
+            for delFile1 in $del1
+            do
+                if [[ $delFile1 =~ ^[0-9]+$ && $delFile1 -lt $i ]];then
+                    delSure[$delCount]=$delFile1
+                    ((delCount++))
+                elif [[ ! $delFile1 || $delFile1 = "n" || $delFile1 = "N" ]]; then
+                    echo -e "${yellow}You cancel this.${plain}"
+                    break 2
+                else
+                    echo -e "${red}No such server. Try aigin.${plain}"
+                    unset delSure
+                    continue 2
+                fi
+            done
+
+            for delFile2 in ${delSure[*]}
+            do
+                echo "${delFile2}"
+                if [ $cur_ss = ${node[$delFile2]} ]; then
                     echo -e "${purple}[Warning]${yellow}Server ${red}$cur_ss ${yellow}is running. [y/N]"
                     while true
                     do
@@ -213,19 +231,14 @@ EOF
                         fi
                     done                 
                 fi
-                sudo rm -f ${path}${node[$del1]}.json
-                if [ ! -e ${path}${node[$del1]}.json ]; then
-                    echo -e "${green}Delete server ${node[$del1]} successfully.${plain}"
+                sudo rm -f ${path}${node[$delFile2]}.json
+                if [ ! -e ${path}${node[$delFile2]}.json ]; then
+                    echo -e "${green}Delete server ${node[$delFile2]} successfully.${plain}"
                 else
-                    echo -e "${red}Delete server ${node[$del1] failed.}${plain}"
+                    echo -e "${red}Delete server ${node[$delFile2] failed.}${plain}"
                 fi
-                break
-            elif [ $del1 = "n" ]; then
-                echo -e "${yellow}You cancel this.${plain}"
-                break
-            else
-                echo -e "${red}No such server. Try aigin.${plain}"
-            fi
+            done
+            break
         done        
     elif [ $sel = "e" ]; then 
         echo -e "${purple}Byebye~~~${plain}"
@@ -248,5 +261,7 @@ EOF
             echo -e "${red}Start server ${node[$sel]} failed. Check config file in '/etc/shadowsocks'. ${plain}"
         fi
     fi
+    unset cur_ss
+    unset delSure
     sleep 1
 done
