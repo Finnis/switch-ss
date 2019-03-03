@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# Colors
 plain='\033[0m'
 red='\033[31m'
 yellow='\033[33m'
@@ -15,6 +16,7 @@ blackinwhite='\033[47;30m'
 blink='\033[05m'
 highlight='\033[01m'
 
+#Protocal
 chipers=(
 aes-256-gcm
 aes-192-gcm
@@ -37,6 +39,7 @@ rc4-md5
 
 path='/etc/shadowsocks/'
 
+#All script runs in this 'while'
 while true
 do
     files=$(ls $path | grep json)
@@ -45,6 +48,7 @@ do
     cur_ss=${cur_ss%%.*}
     [ -z $cur_ss ] && cur_ss=NONE
 
+    #Show origin Menus
     showChoice(){
         clear
         echo -e " ${purple}Current Server: ${green}${highlight}$cur_ss ${plain}"
@@ -67,6 +71,9 @@ do
     echo -e "${red} e: Exit.${plain}"
     }
 
+    #Show Menus and Get user input
+    #node[*] is a array means available server in /etc/shadowsocks/
+    #cur_ss means the current choice of servers
     while true
     do
         showChoice
