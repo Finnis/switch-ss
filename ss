@@ -55,20 +55,22 @@ do
         echo -e " ${yellow}Make Your Choice: ${plain}"
         i=1
         node[0]=NO_DATA
+        printf "${red}%-4s %-18s %-18s %-10s %-12s${plain}\n" Seq ServerName IPAddress Ping HttpsConnect
         for filename in $files
         do
             node[$i]=${filename%%.*}
-            if [ "$cur_ss" = "${node[$i]}" ]; then
-                echo -e "${blink}${red} ${i}: ${skyblue}${node[$i]} ${plain}"
-            else
-                echo -e "${red} ${i}: ${skyblue}${node[$i]} ${plain}"
-            fi
-            ((i++))   
+            nodeIpTmp=$(cat ${path}${node[$i]}.json | grep '"server":')
+            nodeIpTmp=${nodeIpTmp%\"*}; nodeIp[$i]=${nodeIpTmp##*\"}
+            printf "%3s|  %-12s|  %-16s | %10s  |  %9s\n" ${i}. ${node[$i]} ${nodeIp[$i]} ${pingValues[$i]} ${httpsValues[$i]}
+            ((i++))
         done
-    echo -e "${purple} 0: ${purple}Restart current server ${plain}"
-    echo -e "${blue} a: ${blue}Add a config file.${plain}"
-    echo -e "${blue} d: ${blue}Delect servers.${plain}"
-    echo -e "${red} e: Exit.${plain}"
+        printf "%-50s\n" ---------------------------------------------------------------------
+        echo -e "${purple} 0: ${purple}Restart current server ${plain}"
+        echo -e "${blue} a: ${blue}Add  servers.${plain}"
+        echo -e "${blue} d: ${blue}Del  servers.${plain}"
+        echo -e "${blue} t: ${blue}Test servers.${plain}"
+        echo -e "${blue} e: ${blue}Edit servers.${plain}"
+        echo -e "${red} x: Exit.${plain}"
     }
 
     #Show Menus and Get user input
@@ -80,7 +82,7 @@ do
         read -p "[Default:0] " sel
         [[ -z $sel ]] && sel="0"
 #        [[ ! $sel =~ ^[0-9]+$ ]] && echo -e "${red}[Error!] Please try again. ${plain}" && sleep 0.7 && continue
-        if [[ $sel =~ ^[0-9]+$ && $sel -lt $i || $sel = "a" || $sel = "d" || $sel = "e" ]] >/dev/null 2>&1; then
+        if [[ $sel =~ ^[0-9]+$ && $sel -lt $i || $sel = "a" || $sel = "d" || $sel = "e" || $sel = "t" || $sel = "x" ]] >/dev/null 2>&1; then
             break
         else
             echo -e "${red}[Error!] Please try again. ${plain}"
@@ -245,13 +247,62 @@ EOF
                     echo -e "${red}Delete server ${node[$delFile2] failed.}${plain}"
                 fi
             done
+            unset pingValues
+            unset httpsValues
             break
         done        
-    elif [ $sel = "e" ]; then 
+    elif [ $sel = "x" ]; then 
         echo -e "${purple}Byebye~~~${plain}"
         sleep 0.5
         clear
         exit 0
+    elif [ $sel = "t" ]; then
+        j=1
+        for pingIp in ${nodeIp[*]}
+        do
+            #printf "${yellow}Testing   ${purple}%-12s${yellow}---${plain}" ${node[$j]}
+            pingReturn=$(ping $pingIp -q -c 3 -i 0.5 -W 3)
+            pingValue=${pingReturn%/*}; pingValue=${pingValue%/*}; pingValue=${pingValue##*/}
+            while [ ${#pingValue} -lt 7 ]
+            do
+                pingValue="${pingValue}0"
+            done
+            for test1 in $pingReturn
+            do
+                if [ $test1 = "100%" ]; then
+                    pingValue="---------"
+                    break
+                fi
+            done
+            [ $pingValue != "---------" ] && pingValues[$j]="${pingValue}ms"
+            [ $pingValue = "---------" ] && pingValues[$j]=${pingValue}
+            if [ ${node[$j]} != ${cur_ss} ]; then
+                /usr/bin/ss-local  -c  ${path}${node[$j]}.json -l 33333 >/dev/null 2>&1 &
+                httpsReturn=$(curl -w "TCP handshake: %{time_connect}, SSL handshake: %{time_appconnect}\n" -so /dev/null https://www.google.com --socks5 127.0.0.1:33333 --connect-timeout 7)
+                pkill -f ${node[$j]}.json
+            else
+                catPort=$(cat ${path}${cur_ss}.json | grep "local_port")
+                catPort=${catPort#*\:}; cur_port=${catPort%\,*}
+                httpsReturn=$(curl -w "TCP handshake: %{time_connect}, SSL handshake: %{time_appconnect}\n" -so /dev/null https://www.google.com --socks5 127.0.0.1:${cur_port} --connect-timeout 7)
+            fi
+            httpsReturn1=${httpsReturn#*\:}
+            httpsTCP=${httpsReturn1%\,*}
+            httpsSSL=${httpsReturn##*\:}
+            if [ $httpsSSL = "0.000000" ]; then
+                httpsValues[$j]="timeout"
+            else
+                httpsValue=$(awk "BEGIN{print ($httpsTCP+$httpsSSL)*1000 }")
+                while [ ${#httpsValue} -lt 7 ]
+                do
+                    httpsValue="${httpsValue}0"
+                done
+                httpsValues[$j]="${httpsValue}ms"
+            fi            
+            showChoice
+            #printf "${green}%3.1f%%     ${skyblue}%7s   %7s${plain}\n" $(awk "BEGIN{print ($j/$i)*100 }") ${pingValues[$j]} ${httpsValues[$j]}
+            ((j++))
+        done
+
     else
         if [ $cur_ss != "NONE" ]; then
             echo -e "${yellow}Stoping server ${red}${cur_ss}... ${plain}"
@@ -270,5 +321,6 @@ EOF
     fi
     unset cur_ss
     unset delSure
-    sleep 1
+    unset i
+    sleep 0.5
 done
