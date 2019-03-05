@@ -86,7 +86,7 @@ do
         read -p "[Default:0] " sel
         [[ -z $sel ]] && sel="0"
 #        [[ ! $sel =~ ^[0-9]+$ ]] && echo -e "${red}[Error!] Please try again. ${plain}" && sleep 0.7 && continue
-        if [[ $sel =~ ^[0-9]+$ && $sel -lt $i || $sel = "a" || $sel = "d" || $sel = "e" || $sel = "t" || $sel = "x" ]] >/dev/null 2>&1; then
+        if [[ $sel =~ ^[0-9]+$ && $sel -le $i || $sel = "a" || $sel = "d" || $sel = "e" || $sel = "t" || $sel = "x" ]] >/dev/null 2>&1; then
             break
         else
             echo -e "${red}[Error!] Please try again. ${plain}"
@@ -177,7 +177,7 @@ do
             read yn2
             [ -z $yn2 ] && yn2="y"
             if [[ $yn2 = "Y" || $yn2="y" ]]; then
-                sudo  tee /etc/shadowsocks/${filename}.json<<-EOF
+                sudo  tee ${path}${filename}.json<<-EOF
 {
     "server":"${server}",
     "server_port":${server_port},
@@ -190,7 +190,7 @@ do
     "mode":"tcp_and_udp"
 }
 EOF
-                echo -e "${green}File created successfully.${yellow}Press any key to exit.${plain} \c"
+                echo -e "${green}File created successfully.${yellow}Press ENTER to exit.${plain} \c"
                 read yn1
                 break
             elif [[$yn2 = "N" || $yn2="n" ]]; then
@@ -211,7 +211,7 @@ EOF
             delCount=0
             for delFile1 in $del1
             do
-                if [[ $delFile1 =~ ^[0-9]+$ && $delFile1 -lt $i ]];then
+                if [[ $delFile1 =~ ^[0-9]+$ && $delFile1 -le $i && $delFile1 -ne 0 ]];then
                     delSure[$delCount]=$delFile1
                     ((delCount++))
                 elif [[ ! $delFile1 || $delFile1 = "n" || $delFile1 = "N" ]]; then
@@ -262,7 +262,7 @@ EOF
         exit 0
     elif [ $sel = "t" ]; then
         unset httpsValues; unset pingValues
-        printf "${yellow}Testing   ${purple}%-12s${yellow}---${plain}" ${node[$j]}
+        printf "${yellow}Testing...${plain}"
         for ((l=0;l<2;l++))
         do
             {
@@ -327,6 +327,135 @@ EOF
         rm -f ~/.ssHttpTmp
         continue
     elif [ $sel = "e" ]; then
+        echo -e "${yellow}Select a server to edit:[n]${plain} \c"
+        while true
+        do
+            read editFile
+            if [[ $editFile =~ ^[0-9]+$ && $editFile -le $i && $editFile -ne 0 ]];then
+                serverEdi=$(cat ${path}${node[$editFile]}.json | grep '"server":'); serverEdi=${serverEdi%\"*}; serverEdi=${serverEdi##*\"}
+                serverPortEdi=$(cat ${path}${node[$editFile]}.json | grep '"server_port":'); serverPortEdi=${serverPortEdi%\,*} ; serverPortEdi=${serverPortEdi##*\:}
+                localAddressEdi=$(cat ${path}${node[$editFile]}.json | grep '"local_address":'); localAddressEdi=${localAddressEdi%\"*}; localAddressEdi=${localAddressEdi##*\"}
+                localPortEdi=$(cat ${path}${node[$editFile]}.json | grep '"local_port":'); localPortEdi=${localPortEdi%\,*}; localPortEdi=${localPortEdi##*\:}
+                passwordEdi=$(cat ${path}${node[$editFile]}.json | grep 'password'); passwordEdi=${passwordEdi%\"*}; passwordEdi=${passwordEdi##*\"}
+                timeoutEdi=$(cat ${path}${node[$editFile]}.json | grep '"timeout":'); timeoutEdi=${timeoutEdi%\,*}; timeoutEdi=${timeoutEdi##*\:}
+                methodEdi=$(cat ${path}${node[$editFile]}.json | grep '"method":'); methodEdi=${methodEdi%\"*}; methodEdi=${methodEdi##*\"}
+                fastopenEdi=$(cat ${path}${node[$editFile]}.json | grep '"fast_open":'); fastopenEdi=${fastopenEdi%\,*}; fastopenEdi=${fastopenEdi##*\:}
+                modeEdi=$(cat ${path}${node[$editFile]}.json | grep '"mode":'); modeEdi=${modeEdi%\"*}; modeEdi=${modeEdi##*\"}
+
+                while true
+                do
+                    clear
+                    echo -e "${red}w:save and quit  q:quit without save${plain}"
+                    echo "********************************************"
+                    echo -e "${yellow}The ${green}${node[$editFile]}.json ${yellow}is now as follows:${plain}"
+                    echo "--------------------------------------------"
+                    printf "${red}1.${plain}${blue}%12s${plain} : ${purple}%-25s${plain}\n" server ${serverEdi}
+                    printf "${red}2.${plain}${blue}%12s${plain} : ${purple}%-25s${plain}\n" server_port ${serverPortEdi}
+                    printf "${red}3.${plain}${blue}%12s${plain} : ${purple}%-25s${plain}\n" local_addr ${localAddressEdi}
+                    printf "${red}4.${plain}${blue}%12s${plain} : ${purple}%-25s${plain}\n" local_port ${localPortEdi}
+                    printf "${red}5.${plain}${blue}%12s${plain} : ${purple}%-25s${plain}\n" password ${passwordEdi}
+                    printf "${red}6.${plain}${blue}%12s${plain} : ${purple}%-25s${plain}\n" timeout ${timeoutEdi}
+                    printf "${red}7.${plain}${blue}%12s${plain} : ${purple}%-25s${plain}\n" method ${methodEdi}
+                    printf "${red}8.${plain}${blue}%12s${plain} : ${purple}%-25s${plain}\n" fast_open ${fastopenEdi}
+                    printf "${red}9.${plain}${blue}%12s${plain} : ${purple}%-25s${plain}\n" mode ${modeEdi}
+                    echo "--------------------------------------------"
+                    echo -e "${yellow}Select a parameter. ${plain}${red}[q] to back.${plain}\c"
+                    read paraSel
+                    if [[ $paraSel =~ ^[0-9]+$ && $paraSel -le 9 && $paraSel -ne 0 ]];then
+                        if [ $paraSel -eq 1 ]; then
+                            echo -e "${yellow}Enter new server address:${plain}\c"
+                            read paraInput
+                            [ ! -z $paraInput ] && serverEdi=$paraInput
+                            [ -z $paraInput ] && echo -e "${red}Nothing to change!${plain}" && sleep 0.5
+                        elif [ $paraSel -eq 2 ]; then
+                            echo -e "${yellow}Enter new server port:${plain}\c"
+                            read paraInput
+                            [ ! -z $paraInput ] && serverPortEdi=$paraInput
+                            [ -z $paraInput ] && echo -e "${red}Nothing to change!${plain}" && sleep 0.5
+                        elif [ $paraSel -eq 3 ]; then
+                            echo -e "${yellow}Enter new local address:${plain}\c"
+                            read paraInput
+                            [ ! -z $paraInput ] && localAddressEdi=$paraInput
+                            [ -z $paraInput ] && echo -e "${red}Nothing to change!${plain}" && sleep 0.5
+                        elif [ $paraSel -eq 4 ]; then
+                            echo -e "${yellow}Enter new local port:${plain}\c"
+                            read paraInput
+                            [ ! -z $paraInput ] && localPortEdi=$paraInput
+                            [ -z $paraInput ] && echo -e "${red}Nothing to change!${plain}" && sleep 0.5
+                        elif [ $paraSel -eq 5 ]; then
+                            echo -e "${yellow}Enter new password:${plain}\c"
+                            read paraInput
+                            [ ! -z $paraInput ] && passwordEdi=$paraInput
+                            [ -z $paraInput ] && echo -e "${red}Nothing to change!${plain}" && sleep 0.5
+                        elif [ $paraSel -eq 6 ]; then
+                            echo -e "${yellow}Enter new timeout:${plain}\c"
+                            read paraInput
+                            [ ! -z $paraInput ] && timeoutEdi=$paraInput
+                            [ -z $paraInput ] && echo -e "${red}Nothing to change!${plain}" && sleep 0.5
+                        elif [ $paraSel -eq 7 ]; then
+                            clear
+                            echo "********************************************"
+                            echo -e "${yellow}Select a protocal.${plain}"
+                            for ((j=0;j<17;j++))
+                            do
+                                echo -e "${red}${j}.${plain} ${blue}${chipers[$j]}${plain}"
+                            done
+                            echo "********************************************"
+                            echo -e "${yellow}Select a protocal:${plain} \c"
+                            read paraInput
+                            if [[ $paraInput -lt 17 && $paraInput -ge 0 ]]; then
+                                methodEdi=${chipers[$paraInput]}
+                            else
+                                echo -e "${red}[Error] No such protocal.${plain}"
+                                sleep 0.5
+                            fi
+                        elif [ $paraSel -eq 8 ]; then
+                            echo -e "${yellow}fastopen:[${purple}true${plain} or ${purple}false${plain}${yellow}]${plain}\c"
+                            read paraInput
+                            [[ $paraInput != "true" || $paraInput != "false" ]] && echo -e "${red}Nothing to change!${plain}" && sleep 0.5 && continue
+                            fastopenEdi=$paraInput
+                        else
+                            echo -e "${yellow}Enter new mode:${plain}"
+                            echo -e "${purple}[ tcp_and_udp | tcp_only | udp_only ] ${plain}\c"
+                            read paraInput
+                            [[ $paraInput != "tcp_and_udp" && $paraInput != "tcp_only" && ${paraInput} != "udp_only" ]] && echo -e "${red}Nothing to change!${plain}" && sleep 0.5 && continue
+                            modeEdi=$paraInput
+                            continue
+                        fi
+                    elif [[ $paraSel = "q" || -z $paraSel ]]; then
+                        echo -e "${yellow}Exting...${plain}"
+                        sleep 0.5
+                        break 2
+                    elif [ $paraSel = "w" ]; then
+                        sudo  tee ${path}${node[$editFile]}.json<<-EOF
+{
+    "server":"${serverEdi}",
+    "server_port":${serverPortEdi},
+    "local_address":"${localAddressEdi}",
+    "local_port":${localPortEdi},
+    "password":"${passwordEdi}",
+    "timeout":${timeoutEdi},
+    "method":"${methodEdi}",
+    "fast_open":${fastopenEdi},
+    "mode":"${modeEdi}"
+}
+EOF
+                        echo -e "Changes saved. Exiting..."
+                        break 2
+                    else
+                        echo -e "${red}[Error] No such parameter.[n]${plain}\c"
+                        sleep 0.7
+                    fi
+                done
+            elif [[ $editFile = "n" || -z $editFile ]]; then
+                echo -e "${yellow}You cancel this.${plain}"
+                sleep 0.5
+                continue 2
+            else
+                echo -e "${red}[Error] No such server.[n]  \c${plain}"
+                sleep 0.7
+            fi
+        done
         continue
     else
         if [ $cur_ss != "NONE" ]; then
@@ -347,5 +476,5 @@ EOF
     unset cur_ss
     unset delSure
     unset i
-    read xxx
+    sleep 0.7
 done
