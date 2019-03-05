@@ -1,6 +1,9 @@
 
-echo "scale=3;4 * 0.56" | bc
+MoveTo(){
+    printf "\033[$1;$2H\033[0m"
+}
 
-no=54;
-result=`echo "$no * 1.5" | bc`
-echo $result
+MoveTo 34 35
+echo -e "\033[15:40H"
+
+echo -e "ESC[23A"

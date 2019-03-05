@@ -51,13 +51,13 @@ do
     #Show origin Menus
     showChoice(){
         clear
-        echo -e " ${purple}Current Server: ${green}${highlight}$cur_ss ${plain}"
-        echo -e " ${yellow}Make Your Choice: ${plain}"
-        i=1
+#        echo -e " ${purple}Current Server: ${green}${highlight}$cur_ss ${plain}"
+        i=0
         node[0]=NO_DATA
         printf "${red}%-4s %-18s %-17s %-10s %-12s${plain}\n" Seq ServerName IPAddress Ping HttpsConnect
         for filename in $files
         do
+            ((i++))
             node[$i]=${filename%%.*}
             nodeIpTmp=$(cat ${path}${node[$i]}.json | grep '"server":')
             nodeIpTmp=${nodeIpTmp%\"*}; nodeIp[$i]=${nodeIpTmp##*\"}
@@ -66,9 +66,9 @@ do
             else
                 printf "%3s|  %-12s|  %-16s |%8s  |  %9s \n" ${i}. ${node[$i]} ${nodeIp[$i]} ${pingValues[$i]} ${httpsValues[$i]}
             fi
-            ((i++))
         done
-        printf "%-50s\n" ---------------------------------------------------------------------
+        printf "%-50s\n" -----------------------------------------------------------------
+        echo -e " ${yellow}Make Your Choice: ${plain}"
         echo -e "${purple} 0: ${purple}Restart current server ${plain}"
         echo -e "${blue} a: ${blue}Add  servers.${plain}"
         echo -e "${blue} d: ${blue}Del  servers.${plain}"
@@ -261,46 +261,73 @@ EOF
         clear
         exit 0
     elif [ $sel = "t" ]; then
-        j=1
-        for pingIp in ${nodeIp[*]}
+        unset httpsValues; unset pingValues
+        printf "${yellow}Testing   ${purple}%-12s${yellow}---${plain}" ${node[$j]}
+        for ((l=0;l<2;l++))
         do
-            #printf "${yellow}Testing   ${purple}%-12s${yellow}---${plain}" ${node[$j]}
-            pingReturn=$(ping $pingIp -q -c 3 -i 0.5 -W 3)
-            pingValue=${pingReturn%/*}; pingValue=${pingValue%/*}; pingValue=${pingValue##*/}            
-            for test1 in $pingReturn
-            do
-                if [ $test1 = "100%" ]; then
-                    pingValue="------"
-                    break
+            {
+                if [ $l -eq 0 ]; then
+                    for((j=1;j<=$i;j++))
+                    do
+                        pingReturn=$(ping ${nodeIp[$j]} -q -c 3 -i 0.3 -W 3)
+                        pingValue=${pingReturn%/*}; pingValue=${pingValue%/*}; pingValue=${pingValue##*/}            
+                        for test1 in ${pingReturn[*]}
+                        do
+                            {
+                                if [ test1 = "100%" ]; then
+                                    pingValue="------"
+                                    break
+                                fi
+                            }&
+                        done
+                        [ $pingValue != "------" ] && pingValue=`printf "%.2f" ${pingValue}` && echo "${j}:ping:${node[$j]}:${pingValue}" >> ~/.ssHttpTmp
+                        [ $pingValue = "------" ] && echo "${j}:ping:${node[$j]}:${pingValue}" >> ~/.ssHttpTmp 
+                    done
+                else
+                    for((k=1;k<=$i;k++))
+                    do
+                        {
+                            if [ ${node[$k]} != ${cur_ss} ]; then
+                                let portTmp[$k]=k+33333
+                                /usr/bin/ss-local  -c  ${path}${node[$k]}.json -l ${portTmp[$k]} >/dev/null 2>&1 &
+                                httpsReturn[$k]=$(curl -w "TCP handshake: %{time_connect}, SSL handshake: %{time_appconnect}\n" -so /dev/null https://www.google.com --socks5 127.0.0.1:${portTmp[$k]} --connect-timeout 7)
+                                pkill -f ${node[$k]}.json
+                            else
+                                catPort[$k]=$(cat ${path}${cur_ss}.json | grep "local_port")
+                                catPort[$k]=${catPort[$k]#*\:}; cur_port[$k]=${catPort[$k]%\,*}
+                                httpsReturn[$k]=$(curl -w "TCP handshake: %{time_connect}, SSL handshake: %{time_appconnect}\n" -so /dev/null https://www.google.com --socks5 127.0.0.1:${cur_port[$k]} --connect-timeout 7)
+                            fi
+                            httpsReturn1[$k]=${httpsReturn[$k]#*\:}
+                            httpsTCP[$k]=${httpsReturn1[$k]%\,*} ;
+                            httpsSSL[$k]=${httpsReturn[$k]##*\:} ;
+                            if [ ${httpsSSL[$k]} = "0.000000" ]; then
+                                echo "${k}:${node[$k]}:timeout" >> ~/.ssHttpTmp
+                            else
+                                httpsValue[$k]=`echo "(${httpsTCP[$k]} + ${httpsSSL[$k]})*1000" | bc`
+                                httpsValue[$k]=`printf "%.2f" ${httpsValue[$k]}`
+                                echo "${k}:${node[$k]}:${httpsValue[$k]}" >> ~/.ssHttpTmp
+                            fi
+                        }&
+                    done
+                    wait
                 fi
-            done
-            [ $pingValue != "------" ] && pingValue=`printf "%.2f" ${pingValue}` && pingValues[$j]="${pingValue}"
-            [ $pingValue = "------" ] && pingValues[$j]=${pingValue}
-            if [ ${node[$j]} != ${cur_ss} ]; then
-                /usr/bin/ss-local  -c  ${path}${node[$j]}.json -l 33333 >/dev/null 2>&1 &
-                httpsReturn=$(curl -w "TCP handshake: %{time_connect}, SSL handshake: %{time_appconnect}\n" -so /dev/null https://www.google.com --socks5 127.0.0.1:33333 --connect-timeout 7)
-                pkill -f ${node[$j]}.json
-            else
-                catPort=$(cat ${path}${cur_ss}.json | grep "local_port")
-                catPort=${catPort#*\:}; cur_port=${catPort%\,*}
-                httpsReturn=$(curl -w "TCP handshake: %{time_connect}, SSL handshake: %{time_appconnect}\n" -so /dev/null https://www.google.com --socks5 127.0.0.1:${cur_port} --connect-timeout 7)
-            fi
-            httpsReturn1=${httpsReturn#*\:}
-            httpsTCP=${httpsReturn1%\,*} ;
-            httpsSSL=${httpsReturn##*\:} ;
-            if [ $httpsSSL = "0.000000" ]; then
-                httpsValues[$j]="timeout"
-            else
-                httpsValue=`echo "($httpsTCP + $httpsSSL)*1000" | bc`
-                httpsValue=`printf "%.2f" $httpsValue`
-                httpsValues[$j]="${httpsValue}"
-            fi
-            
-            showChoice
-            #printf "${green}%3.1f%%     ${skyblue}%7s   %7s${plain}\n" $(awk "BEGIN{print ($j/$i)*100 }") ${pingValues[$j]} ${httpsValues[$j]}
-            ((j++))
+            }&
         done
-
+        wait
+        for ((j=1;j<=$i;j++))
+        do
+            pingValueTmp=$(cat ~/.ssHttpTmp | grep "${j}:ping:${node[$j]}:")
+            pingValues[$j]=${pingValueTmp##*\:}
+        done
+        for ((j=1;j<=$i;j++))
+        do
+            httpsValueTmp=$(cat ~/.ssHttpTmp | grep "${j}:${node[$j]}:")
+            httpsValues[$j]=${httpsValueTmp##*\:}
+        done
+        rm -f ~/.ssHttpTmp
+        continue
+    elif [ $sel = "e" ]; then
+        continue
     else
         if [ $cur_ss != "NONE" ]; then
             echo -e "${yellow}Stoping server ${red}${cur_ss}... ${plain}"
@@ -320,5 +347,5 @@ EOF
     unset cur_ss
     unset delSure
     unset i
-    sleep 0.5
+    read xxx
 done
