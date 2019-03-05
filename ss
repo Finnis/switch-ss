@@ -55,13 +55,17 @@ do
         echo -e " ${yellow}Make Your Choice: ${plain}"
         i=1
         node[0]=NO_DATA
-        printf "${red}%-4s %-18s %-18s %-10s %-12s${plain}\n" Seq ServerName IPAddress Ping HttpsConnect
+        printf "${red}%-4s %-18s %-17s %-10s %-12s${plain}\n" Seq ServerName IPAddress Ping HttpsConnect
         for filename in $files
         do
             node[$i]=${filename%%.*}
             nodeIpTmp=$(cat ${path}${node[$i]}.json | grep '"server":')
             nodeIpTmp=${nodeIpTmp%\"*}; nodeIp[$i]=${nodeIpTmp##*\"}
-            printf "%3s|  %-12s|  %-16s | %10s  |  %9s\n" ${i}. ${node[$i]} ${nodeIp[$i]} ${pingValues[$i]} ${httpsValues[$i]}
+            if [ $cur_ss = ${node[$i]} ]; then
+                printf "${highlight}%3s|  %-12s|  %-16s |%8s  |  %9s ${plain}\n" ${i}. ${node[$i]} ${nodeIp[$i]} ${pingValues[$i]} ${httpsValues[$i]}
+            else
+                printf "%3s|  %-12s|  %-16s |%8s  |  %9s \n" ${i}. ${node[$i]} ${nodeIp[$i]} ${pingValues[$i]} ${httpsValues[$i]}
+            fi
             ((i++))
         done
         printf "%-50s\n" ---------------------------------------------------------------------
@@ -262,20 +266,16 @@ EOF
         do
             #printf "${yellow}Testing   ${purple}%-12s${yellow}---${plain}" ${node[$j]}
             pingReturn=$(ping $pingIp -q -c 3 -i 0.5 -W 3)
-            pingValue=${pingReturn%/*}; pingValue=${pingValue%/*}; pingValue=${pingValue##*/}
-            while [ ${#pingValue} -lt 7 ]
-            do
-                pingValue="${pingValue}0"
-            done
+            pingValue=${pingReturn%/*}; pingValue=${pingValue%/*}; pingValue=${pingValue##*/}            
             for test1 in $pingReturn
             do
                 if [ $test1 = "100%" ]; then
-                    pingValue="---------"
+                    pingValue="------"
                     break
                 fi
             done
-            [ $pingValue != "---------" ] && pingValues[$j]="${pingValue}ms"
-            [ $pingValue = "---------" ] && pingValues[$j]=${pingValue}
+            [ $pingValue != "------" ] && pingValue=`printf "%.2f" ${pingValue}` && pingValues[$j]="${pingValue}"
+            [ $pingValue = "------" ] && pingValues[$j]=${pingValue}
             if [ ${node[$j]} != ${cur_ss} ]; then
                 /usr/bin/ss-local  -c  ${path}${node[$j]}.json -l 33333 >/dev/null 2>&1 &
                 httpsReturn=$(curl -w "TCP handshake: %{time_connect}, SSL handshake: %{time_appconnect}\n" -so /dev/null https://www.google.com --socks5 127.0.0.1:33333 --connect-timeout 7)
@@ -286,18 +286,16 @@ EOF
                 httpsReturn=$(curl -w "TCP handshake: %{time_connect}, SSL handshake: %{time_appconnect}\n" -so /dev/null https://www.google.com --socks5 127.0.0.1:${cur_port} --connect-timeout 7)
             fi
             httpsReturn1=${httpsReturn#*\:}
-            httpsTCP=${httpsReturn1%\,*}
-            httpsSSL=${httpsReturn##*\:}
+            httpsTCP=${httpsReturn1%\,*} ;
+            httpsSSL=${httpsReturn##*\:} ;
             if [ $httpsSSL = "0.000000" ]; then
                 httpsValues[$j]="timeout"
             else
-                httpsValue=$(awk "BEGIN{print ($httpsTCP+$httpsSSL)*1000 }")
-                while [ ${#httpsValue} -lt 7 ]
-                do
-                    httpsValue="${httpsValue}0"
-                done
-                httpsValues[$j]="${httpsValue}ms"
-            fi            
+                httpsValue=`echo "($httpsTCP + $httpsSSL)*1000" | bc`
+                httpsValue=`printf "%.2f" $httpsValue`
+                httpsValues[$j]="${httpsValue}"
+            fi
+            
             showChoice
             #printf "${green}%3.1f%%     ${skyblue}%7s   %7s${plain}\n" $(awk "BEGIN{print ($j/$i)*100 }") ${pingValues[$j]} ${httpsValues[$j]}
             ((j++))
