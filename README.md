@@ -5,6 +5,7 @@ This is a shell script which I use to switch shadowsocks-libev servers on my Arc
 - You should install shadowsocks-libev on your linux, for other shadowsocks version, some change need to be done.     
 For example, the default config file path for shadowsocks-libev is `/etc/shadowsocks/`; default start user is 'nobody'; there are more protocal methods in ss-libev than other versions.
 - For mathematics, install 'bc'.
+- For speedtest function. Proxychains and speedtest-cli is needed.
 ## How to use
 Just copy the 'ss' file to 'usr/local/bin'. Than type ss in command line. I won't give more details about how to use, because I believe that I've tried my best to make it easy to use.
 ## Why write it
