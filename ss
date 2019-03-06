@@ -54,7 +54,7 @@ do
 #        echo -e " ${purple}Current Server: ${green}${highlight}$cur_ss ${plain}"
         i=0
         node[0]=NO_DATA
-        printf "${red}%-4s %-18s %-17s %-10s %-12s${plain}\n" Seq ServerName IPAddress Ping HttpsConnect
+        printf "${red}%-3s %-14s %-16s %-8s %-9s %-16s ${plain}\n" Seq ServerName IPAddress Ping Https 'Speed(Mbps)'
         for filename in $files
         do
             ((i++))
@@ -62,9 +62,11 @@ do
             nodeIpTmp=$(cat ${path}${node[$i]}.json | grep '"server":')
             nodeIpTmp=${nodeIpTmp%\"*}; nodeIp[$i]=${nodeIpTmp##*\"}
             if [ $cur_ss = ${node[$i]} ]; then
-                printf "${highlight}%3s|  %-12s|  %-16s |%8s  |  %9s ${plain}\n" ${i}. ${node[$i]} ${nodeIp[$i]} ${pingValues[$i]} ${httpsValues[$i]}
+                printf "${highlight}%3s| %-10s| %-15s |%7s |%9s | ${plain}" ${i}. ${node[$i]} ${nodeIp[$i]} ${pingValues[$i]} ${httpsValues[$i]}
+                printf "${highlight}↓%5s ↑%5s${plain}\n" ${nodeSpeedDown[$i]} ${nodeSpeedUp[$i]}
             else
-                printf "%3s|  %-12s|  %-16s |%8s  |  %9s \n" ${i}. ${node[$i]} ${nodeIp[$i]} ${pingValues[$i]} ${httpsValues[$i]}
+                printf "%3s| %-10s| %-15s |%7s |%9s | " ${i}. ${node[$i]} ${nodeIp[$i]} ${pingValues[$i]} ${httpsValues[$i]}
+                printf "↓%5s ↑%5s\n" ${nodeSpeedDown[$i]} ${nodeSpeedUp[$i]}
             fi
         done
         printf "%-50s\n" -----------------------------------------------------------------
@@ -74,6 +76,7 @@ do
         echo -e "${blue} d: ${blue}Del  servers.${plain}"
         echo -e "${blue} t: ${blue}Test servers.${plain}"
         echo -e "${blue} e: ${blue}Edit servers.${plain}"
+        echo -e "${blue} tt: ${blue}Speedtest.${plain}"
         echo -e "${red} x: Exit.${plain}"
     }
 
@@ -86,7 +89,7 @@ do
         read -p "[Default:0] " sel
         [[ -z $sel ]] && sel="0"
 #        [[ ! $sel =~ ^[0-9]+$ ]] && echo -e "${red}[Error!] Please try again. ${plain}" && sleep 0.7 && continue
-        if [[ $sel =~ ^[0-9]+$ && $sel -le $i || $sel = "a" || $sel = "d" || $sel = "e" || $sel = "t" || $sel = "x" ]] >/dev/null 2>&1; then
+        if [[ $sel =~ ^[0-9]+$ && $sel -le $i || $sel = "a" || $sel = "d" || $sel = "e" || $sel = "t" || $sel = "x" || $sel = "tt" ]] >/dev/null 2>&1; then
             break
         else
             echo -e "${red}[Error!] Please try again. ${plain}"
@@ -253,6 +256,8 @@ EOF
             done
             unset pingValues
             unset httpsValues
+            unset nodeSpeedDown
+            unset nodeSpeedUp
             break
         done        
     elif [ $sel = "x" ]; then 
@@ -457,6 +462,30 @@ EOF
             fi
         done
         continue
+    elif [ $sel = "tt" ]; then
+        cp /etc/proxychains.conf ~/.proxychainstmp.conf
+        for ((j=1;j<=$i;j++))
+        do
+            sed '/socks5/d' -i ~/.proxychainstmp.conf
+            echo -e "${yellow}Testing server ${red}${node[$j]} ${yellow}...  ${plain}\c"
+            if [ ${node[$j]} != ${cur_ss} ]; then
+                echo "socks5 127.0.0.1 27777" >> ~/.proxychainstmp.conf
+                /usr/bin/ss-local  -c  ${path}${node[$j]}.json -l 27777 >/dev/null 2>&1 &
+                nodeSpeed[$j]=$(proxychains -q -f ~/.proxychainstmp.conf speedtest-cli --simple)
+                pkill -f ${node[$j]}.json
+                
+            else
+                curPort=$(cat ${path}${cur_ss}.json | grep "local_port")
+                curPort=${curPort#*\:}; curPort=${curPort%\,*}
+                echo "socks5 127.0.0.1 ${curPort}" >> ~/.proxychainstmp.conf
+                nodeSpeed[$j]=$(proxychains -q -f ~/.proxychainstmp.conf speedtest-cli --simple)
+            fi
+            nodeSpeedDown[$j]=${nodeSpeed[$j]%%M*}; nodeSpeedDown[$j]=${nodeSpeedDown[$j]##*\:}
+            nodeSpeedUp[$j]=${nodeSpeed[$j]%M*}; nodeSpeedUp[$j]=${nodeSpeedUp[$j]##*\:}
+            percentShow=$(echo "scale=1;${j}/${i}*100" | bc)
+            echo -e "${green}${percentShow}%${plain}"
+        done
+        rm -f ~/.proxychainstmp.conf
     else
         if [ $cur_ss != "NONE" ]; then
             echo -e "${yellow}Stoping server ${red}${cur_ss}... ${plain}"

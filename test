@@ -1,9 +1,6 @@
 
-MoveTo(){
-    printf "\033[$1;$2H\033[0m"
-}
-
-MoveTo 34 35
-echo -e "\033[15:40H"
-
-echo -e "ESC[23A"
+i=1
+j=3
+percentShow=$(echo "scale=1;${i}/${j}*100" | bc)
+echo $percentShow
+echo -e "${green}${percentShow}%${plain}"
