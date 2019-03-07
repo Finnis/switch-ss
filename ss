@@ -47,6 +47,8 @@ do
     cur_ss=${cur_ss##*/}
     cur_ss=${cur_ss%%.*}
     [ -z $cur_ss ] && cur_ss=NONE
+    curDefault=$(ls /etc/systemd/system/multi-user.target.wants/ | grep 'shadowsocks-libev')
+    curDefault=${curDefault##*\@}; curDefault=${curDefault%\.*}
 
     #Show origin Menus
     showChoice(){
@@ -62,6 +64,9 @@ do
             nodeIpTmp=$(cat ${path}${node[$i]}.json | grep '"server":')
             nodeIpTmp=${nodeIpTmp%\"*}; nodeIp[$i]=${nodeIpTmp##*\"}
             if [ $cur_ss = ${node[$i]} ]; then
+                printf "${green}%3s| %-10s| %-15s |%7s |%9s | ${plain}" ${i}. ${node[$i]} ${nodeIp[$i]} ${pingValues[$i]} ${httpsValues[$i]}
+                printf "${green}↓%5s ↑%5s${plain}\n" ${nodeSpeedDown[$i]} ${nodeSpeedUp[$i]}
+            elif [ ${node[$i]} = $curDefault ]; then
                 printf "${highlight}%3s| %-10s| %-15s |%7s |%9s | ${plain}" ${i}. ${node[$i]} ${nodeIp[$i]} ${pingValues[$i]} ${httpsValues[$i]}
                 printf "${highlight}↓%5s ↑%5s${plain}\n" ${nodeSpeedDown[$i]} ${nodeSpeedUp[$i]}
             else
@@ -71,10 +76,11 @@ do
         done
         printf "%-50s\n" -----------------------------------------------------------------
         echo -e " ${yellow}Make Your Choice: ${plain}"
+        echo -e "${blue} t: ${blue}Test servers.${plain}"
+        echo -e "${blue} s: ${blue}Set default server.${plain}"
         echo -e "${purple} 0: ${purple}Restart current server ${plain}"
         echo -e "${blue} a: ${blue}Add  servers.${plain}"
         echo -e "${blue} d: ${blue}Del  servers.${plain}"
-        echo -e "${blue} t: ${blue}Test servers.${plain}"
         echo -e "${blue} e: ${blue}Edit servers.${plain}"
         echo -e "${blue} tt: ${blue}Speedtest.${plain}"
         echo -e "${red} x: Exit.${plain}"
@@ -89,7 +95,7 @@ do
         read -p "[Default:0] " sel
         [[ -z $sel ]] && sel="0"
 #        [[ ! $sel =~ ^[0-9]+$ ]] && echo -e "${red}[Error!] Please try again. ${plain}" && sleep 0.7 && continue
-        if [[ $sel =~ ^[0-9]+$ && $sel -le $i || $sel = "a" || $sel = "d" || $sel = "e" || $sel = "t" || $sel = "x" || $sel = "tt" ]] >/dev/null 2>&1; then
+        if [[ $sel =~ ^[0-9]+$ && $sel -le $i || $sel = "s" || $sel = "a" || $sel = "d" || $sel = "e" || $sel = "t" || $sel = "x" || $sel = "tt" ]] >/dev/null 2>&1; then
             break
         else
             echo -e "${red}[Error!] Please try again. ${plain}"
@@ -115,6 +121,23 @@ do
                 echo -e "${red}Start server $cur_ss failed. Check config file in '/etc/shadowsocks'. ${plain}"
             fi
         fi
+    elif [ $sel = "s" ]; then
+        echo -e "${yellow}Select a server to run when OS start up:[n] ${plain}\c"
+        while true
+        do
+            read sKey
+            [ -z $sKey ] && sKey='n'
+            if [[ $sKey -le $i && $sKey -gt 0 ]]; then
+                sudo systemctl disable shadowsocks-libev@${curDefault} >/dev/null 2>&1
+                sudo systemctl enable shadowsocks-libev@${node[$sKey]} >/dev/null 2>&1
+                break
+            elif [ $sKey = "n" ]; then
+                echo -e "${yellow}[Warning]You cancel this.${plain}"
+                break
+            else
+                echo -e "${red}[Error]No such server.[n] ${plain}\c"
+            fi            
+        done
     elif [ $sel = "a" ]; then
         clear
         echo -e "${yellow}Select a chiper:${plain}"
@@ -274,16 +297,15 @@ EOF
                 if [ $l -eq 0 ]; then
                     for((j=1;j<=$i;j++))
                     do
-                        pingReturn=$(ping ${nodeIp[$j]} -q -c 3 -i 0.3 -W 3)
+                        pingReturn=$(ping ${nodeIp[$j]} -q -c 3 -i 0.3 -W 3 2>&1)
                         pingValue=${pingReturn%/*}; pingValue=${pingValue%/*}; pingValue=${pingValue##*/}            
-                        for test1 in ${pingReturn[*]}
+                        [ -z $pingValue ] >/dev/null 2>&1 && pingValue="------"
+                        for test1 in $pingReturn
                         do
-                            {
-                                if [ test1 = "100%" ]; then
-                                    pingValue="------"
-                                    break
-                                fi
-                            }&
+                            if [[ $test1 = "100%" || $test1 = 'Invalid' ]]; then
+                                pingValue="------"
+                                break
+                            fi  
                         done
                         [ $pingValue != "------" ] && pingValue=`printf "%.2f" ${pingValue}` && echo "${j}:ping:${node[$j]}:${pingValue}" >> ~/.ssHttpTmp
                         [ $pingValue = "------" ] && echo "${j}:ping:${node[$j]}:${pingValue}" >> ~/.ssHttpTmp 

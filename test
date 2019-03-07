@@ -1,6 +1,5 @@
 
-i=1
-j=3
-percentShow=$(echo "scale=1;${i}/${j}*100" | bc)
-echo $percentShow
-echo -e "${green}${percentShow}%${plain}"
+curDefault=$(ls /etc/systemd/system/multi-user.target.wants/ | grep 'shadowsocks-libev')
+curDefault=${curDefault##*\@}; curDefault=${curDefault%\.*}
+
+echo $curDefault
