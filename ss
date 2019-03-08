@@ -49,6 +49,7 @@ do
     [ -z $cur_ss ] && cur_ss=NONE
     curDefault=$(ls /etc/systemd/system/multi-user.target.wants/ | grep 'shadowsocks-libev')
     curDefault=${curDefault##*\@}; curDefault=${curDefault%\.*}
+    [ -z $curDefault ] && curDefault="NONE"
 
     #Show origin Menus
     showChoice(){
