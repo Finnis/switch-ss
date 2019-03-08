@@ -74,7 +74,7 @@ do
                 printf "↓%5s ↑%5s\n" ${nodeSpeedDown[$i]} ${nodeSpeedUp[$i]}
             fi
         done
-        printf "%-50s\n" -----------------------------------------------------------------
+        printf "%-50s\n" ----------------------------------------------------------------------
         echo -e " ${yellow}Make Your Choice: ${plain}"
         echo -e "${blue} t: ${blue}Test servers.${plain}"
         echo -e "${blue} s: ${blue}Set default server.${plain}"
@@ -505,7 +505,7 @@ EOF
             nodeSpeedDown[$j]=${nodeSpeed[$j]%%M*}; nodeSpeedDown[$j]=${nodeSpeedDown[$j]##*\:}
             nodeSpeedUp[$j]=${nodeSpeed[$j]%M*}; nodeSpeedUp[$j]=${nodeSpeedUp[$j]##*\:}
             percentShow=$(echo "scale=1;${j}/${i}*100" | bc)
-            echo -e "${green}${percentShow}%${plain}"
+            echo -e "${green}${percentShow}% --- ↓${nodeSpeedDown[$j]} ↑${nodeSpeedUp[$j]}${plain}"
         done
         rm -f ~/.proxychainstmp.conf
     else

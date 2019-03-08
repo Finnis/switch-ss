@@ -1,5 +1,0 @@
-
-curDefault=$(ls /etc/systemd/system/multi-user.target.wants/ | grep 'shadowsocks-libev')
-curDefault=${curDefault##*\@}; curDefault=${curDefault%\.*}
-
-echo $curDefault
